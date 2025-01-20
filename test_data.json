@@ -1,0 +1,38 @@
+{
+    "branch": {"id":"Branch1","lat":10.3157,"lon":123.8854},
+    "targets": [
+      {"id":"T1","lat":10.2871,"lon":123.8215,"stay":45,"mandatory":true,"exact_time":null},
+      {"id":"T2","lat":10.5342,"lon":123.9012,"stay":30,"mandatory":false,"exact_time":"10:30"},
+      {"id":"T3","lat":10.4123,"lon":123.7465,"stay":40,"mandatory":false,"exact_time":null},
+      {"id":"T4","lat":10.2234,"lon":123.8567,"stay":34,"mandatory":false,"exact_time":null},
+      {"id":"T5","lat":10.5011,"lon":123.8999,"stay":50,"mandatory":false,"exact_time":null},
+      {"id":"T6","lat":10.3456,"lon":123.7543,"stay":20,"mandatory":false,"exact_time":null},
+      {"id":"T7","lat":10.2567,"lon":123.8432,"stay":60,"mandatory":false,"exact_time":null},
+      {"id":"T8","lat":10.4829,"lon":123.9354,"stay":15,"mandatory":false,"exact_time":null},
+      {"id":"T9","lat":10.3981,"lon":123.7701,"stay":25,"mandatory":false,"exact_time":null},
+      {"id":"T10","lat":10.5321,"lon":123.8876,"stay":45,"mandatory":false,"exact_time":"13:30"},
+      {"id":"T11","lat":10.3812,"lon":123.8123,"stay":35,"mandatory":false,"exact_time":null},
+      {"id":"T12","lat":10.4487,"lon":123.7654,"stay":30,"mandatory":false,"exact_time":null},
+      {"id":"T13","lat":10.2965,"lon":123.9231,"stay":60,"mandatory":false,"exact_time":null},
+      {"id":"T14","lat":10.3451,"lon":123.8134,"stay":20,"mandatory":false,"exact_time":null},
+      {"id":"T15","lat":10.2903,"lon":123.8722,"stay":25,"mandatory":false,"exact_time":null},
+      {"id":"T16","lat":10.4129,"lon":123.8223,"stay":15,"mandatory":false,"exact_time":null},
+      {"id":"T17","lat":10.2601,"lon":123.7422,"stay":45,"mandatory":false,"exact_time":null},
+      {"id":"T18","lat":10.5220,"lon":123.9501,"stay":30,"mandatory":false,"exact_time":null},
+      {"id":"T19","lat":10.1998,"lon":123.7999,"stay":40,"mandatory":false,"exact_time":null},
+      {"id":"T20","lat":10.4576,"lon":123.8355,"stay":50,"mandatory":false,"exact_time":null}
+    ],
+    "date_range":{"start_date":"2024-12-12","end_date":"2024-12-13"},
+    "holidays":[],
+    "weekday_time_windows":{
+      "Thursday":["08:00","19:00"],
+      "Friday":["08:00","12:00"]
+    },
+    "vehicles":[
+      {"id":"V1","off_days":[]}
+    ],
+    "timeout_seconds":10,
+    "use_google_api":false,
+    "google_api_key":null
+  }
+  
