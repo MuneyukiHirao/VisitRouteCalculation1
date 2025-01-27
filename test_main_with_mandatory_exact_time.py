@@ -1,41 +1,41 @@
 import json
 from data_provider import load_data_from_json
-from time_management import generate_daily_windows, generate_node_time_windows, generate_daily_start_ends
+from time_management import generate_daily_start_ends
 from schedule_to_vehicles import convert_vehicle_schedules_to_daily_vehicles
 from cost_matrix_loader import generate_cost_matrix
 from vrp_model_loader import create_routing_model, solve_vrp
 
-if __name__ == "__main__":
-    # JSON読み込み（test_data.json）
-    with open("test_data.json","r",encoding="utf-8") as f:
-        json_data = json.load(f)
 
+def solve_with_mandatory_exact_time(json_data: dict) -> dict:
+    print("[DEBUG] solve_with_mandatory_exact_time: start")
+
+    # JSON解析
     branch, targets, date_range, holidays, weekday_time_windows, vehicles, timeout_seconds, use_google_api, google_api_key = load_data_from_json(json_data)
+    print(f"[DEBUG] Loaded data: {len(targets)} targets, {len(vehicles)} vehicles")
 
-    # スケジュール計算
+    # 車両(1日ごとのスケジュール生成)
     vehicle_schedules = generate_daily_start_ends(date_range, holidays, weekday_time_windows, vehicles)
     daily_start_ends, vehicle_map = convert_vehicle_schedules_to_daily_vehicles(vehicle_schedules)
     num_vehicles = len(daily_start_ends)
+    print(f"[DEBUG] Number of 'virtual vehicles' = {num_vehicles}")
 
+    # コスト行列
     cost_matrix = generate_cost_matrix(branch, targets, use_google_api=use_google_api, google_api_key=google_api_key)
+    print("[DEBUG] Cost matrix generated.")
+
+    # サービスタイム(ターゲットで過ごす時間)
     service_times = [0] + [t['stay'] for t in targets]
 
-    # time_windows設定
-    # デポ(0)は8:00～19:00(480,1140)
-    # mandatory=trueなら通常のtime_window適用
-    # exact_time指定があれば、例えば "10:30" → 10*60+30=630分 で(630,630)
-    # 他はペナルティ付きスキップ可能→自由なウィンドウ0～200000などにするか、全員8:00～19:00でもよいが、
-    # 今回は全て8:00～19:00にして、exact_time指定ノードは強制的に(630,630)にする
+    # 時間ウィンドウ設定
+    depot_window = (480, 1140)
+    full_day_window = (480, 1140)
 
-    depot_window = (480,1140)
-    full_day_window = (480,1140) # 通常ターゲット
-    time_windows_list = [depot_window] # 0=depot
-
+    time_windows_list = [depot_window]  # 0=depot
     for t in targets:
         if t["exact_time"]:
-            hh,mm = map(int,t["exact_time"].split(":"))
-            exact_min = hh*60+mm
-            time_windows_list.append((exact_min, exact_min))
+            hh, mm = map(int, t["exact_time"].split(":"))
+            exact_min = hh * 60 + mm
+            time_windows_list.append((exact_min, exact_min))  # exact_time指定
         else:
             time_windows_list.append(full_day_window)
 
@@ -46,38 +46,87 @@ if __name__ == "__main__":
         daily_start_ends=daily_start_ends,
         targets=targets
     )
+    print("[DEBUG] Routing model created. Starting solve...")
+
     solution = solve_vrp(routing, manager, search_params, timeout_seconds=timeout_seconds)
+    print("[DEBUG] Solve completed.")
+
+    result_dict = {
+        "solution_found": False,
+        "routes": []
+    }
 
     if solution:
-        print("Solution found with mandatory and exact-time targets.")
+        print("[DEBUG] Solution found, extracting route info...")
+        result_dict["solution_found"] = True
+
         time_dimension = routing.GetDimensionOrDie("Time")
+
         for v in range(num_vehicles):
             index = routing.Start(v)
-            route_nodes = []
+            route_indices = []
             while not routing.IsEnd(index):
-                node = manager.IndexToNode(index)
-                arrival_time = solution.Value(time_dimension.CumulVar(index))
-                route_nodes.append((node, arrival_time))
+                route_indices.append(index)
                 index = solution.Value(routing.NextVar(index))
-            node = manager.IndexToNode(index)
-            arrival_time = solution.Value(time_dimension.CumulVar(index))
-            route_nodes.append((node, arrival_time))
+            # Endノードも含める
+            route_indices.append(index)
 
-            print(f"Vehicle {v} route with arrival times:")
-            for (n,t) in route_nodes:
-                if n==0:
-                    loc_name="Depot"
+            vehicle_route_info = []
+            for ridx in route_indices:
+                # ridx = OR-Toolsのルーティングインデックス
+                arrival_time = solution.Value(time_dimension.CumulVar(ridx))
+                node_id = manager.IndexToNode(ridx)  # 対応するターゲットID（0がDepot）
+
+                if node_id == 0:
+                    loc_name = "Depot"
+                    exact_str = "-"
+                    mandatory_str = "-"
                 else:
-                    loc_name=targets[n-1]['id']
-                hh=t//60
-                mm=t%60
-                at=f"{hh:02d}:{mm:02d}"
-                tw_str = "exact_time="+targets[n-1]['exact_time'] if n>0 and targets[n-1]['exact_time'] else "no_exact"
-                mand_str = "MANDATORY" if n>0 and targets[n-1]['mandatory'] else "optional"
-                print(f"  Node {n} ({loc_name}): {at} ({tw_str}, {mand_str})")
+                    loc_name = targets[node_id - 1]["id"]
+                    exact_str = targets[node_id - 1]["exact_time"] if targets[node_id - 1]["exact_time"] else "no_exact"
+                    mandatory_str = "MANDATORY" if targets[node_id - 1]["mandatory"] else "optional"
 
-        # 確認:
-        # mandatoryなT1が必ずルートに含まれているか
-        # exact_timeなT2が10:30に到着しているか
+                hh = arrival_time // 60
+                mm = arrival_time % 60
+                at_str = f"{hh:02d}:{mm:02d}"
+
+                vehicle_route_info.append({
+                    "routing_index": ridx,
+                    "node_id": node_id,
+                    "node_name": loc_name,
+                    "arrival_time_str": at_str,
+                    "exact_time": exact_str,
+                    "mandatory": mandatory_str
+                })
+
+            result_dict["routes"].append({
+                "vehicle_id": v,
+                "stops": vehicle_route_info
+            })
+    else:
+        print("[DEBUG] No solution found.")
+
+    print("[DEBUG] solve_with_mandatory_exact_time: end")
+    return result_dict
+
+
+# 単体実行時のテスト
+if __name__ == "__main__":
+    with open("test_data.json", "r", encoding="utf-8") as f:
+        json_data = json.load(f)
+
+    print("[DEBUG] Running test_main_with_mandatory_exact_time as a script...")
+    result = solve_with_mandatory_exact_time(json_data)
+
+    if result["solution_found"]:
+        print("Solution found with mandatory and exact-time targets.")
+        for route in result["routes"]:
+            v_id = route["vehicle_id"]
+            print(f"Vehicle {v_id} route with arrival times:")
+            for stop in route["stops"]:
+                print(f"  RoutingIndex={stop['routing_index']}, "
+                      f"NodeID={stop['node_id']} ({stop['node_name']}): "
+                      f"{stop['arrival_time_str']} "
+                      f"(exact_time={stop['exact_time']}, {stop['mandatory']})")
     else:
         print("No solution found with mandatory and exact-time targets.")
